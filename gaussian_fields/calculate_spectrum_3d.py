@@ -20,7 +20,7 @@ def spectrum_3D_scalar(data, dx, k_bin_width):
     """
 
     #fourier transform data, shift to have zero freq at centre, find power
-    f=np.fft.fftshift(np.fft.fftn(d))
+    f=np.fft.fftshift(np.fft.fftn(data))
     fsqr=np.real(f*np.conj(f))
 
     #calculate k vectors in each dimension
