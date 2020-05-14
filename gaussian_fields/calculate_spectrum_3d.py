@@ -24,7 +24,7 @@ def spectrum_3D_scalar(data, dx, k_bin_width):
     fsqr=np.real(f*np.conj(f))
 
     #calculate k vectors in each dimension
-    [Mx,My,Mz] = d.shape
+    [Mx,My,Mz] = data.shape
 
     kx = np.fft.fftshift(np.fft.fftfreq(Mx, dx))
     ky = np.fft.fftshift(np.fft.fftfreq(My, dx))
