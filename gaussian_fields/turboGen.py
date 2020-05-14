@@ -383,3 +383,37 @@ def gaussian3Dcos(lx, ly, lz, nx, ny, nz, nmodes, wn1, especf):
 
     print("Done! 3-D Turbulence has been generated!")
     return _r
+
+
+    def gaussian1D_FFT(x,a):
+    """A FFT based generator for scalar gaussian fields in 1D
+    Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
+     1–30. https://doi.org/10.1017/CBO9781107415324.004.
+    Arguments:
+        x {1D float array} -- uniformly spaced array of 1D grid of coordinates over which to generate turbulence
+        a {float} -- power law index, a=-5/3 for Kolmogorov, S(k)=k**a
+    Returns:
+        x {1D array of floats} -- unchanged from input, for convinience (direct to plotting)
+        signal {1D array of float} -- a realisation of a 1D gaussian process with power law k**a.
+    Example:
+        x = np.linspace(0,10,1001)
+        x, sig = gaussian1D_FFT(x,a = -11/3)
+        fig,ax=plt.subplots()
+        ax.plot(x,sig)
+    """
+
+    k=np.fft.fftfreq(k.size, d=x[1]-x[0]) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+    k_pos=k[:k.size//2] #take the positive wavenumbers only - our desired signal is real, so the FT is hermitian
+
+    kr=np.random.randn(k_pos.size) # random number from Gaussian for both 
+    ki=np.random.randn(k_pos.size) # real and imaginary components
+
+    k=(kr+1j*ki)*k_pos**(a/2) # colour the initially white noise with the power spectrum
+    k[0]=0 # set 0 wavenumber to 0, so mean (DC) value is 0.
+
+    #our desired signal is real, so we can use a hermitian FFT to get the output.
+    # we could also create the negative frequencies as the complex conjugate of the positive frequencies
+    # and then use the full Fourier transform, but there's no need.
+    signal=np.fft.hfft(k_total, n=x.size) # specify n to ensure correct size of output
+
+    return x, signal 
