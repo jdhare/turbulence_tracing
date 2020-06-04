@@ -63,7 +63,7 @@ def compute1Dspectrum(r,lx, smooth):
     n = nx
     rh = fftn(r)/nt
     # calculate energy in fourier domain
-    tkeh = 0.5 * (rh * np.conj(rh)).real
+    tkeh = (rh * np.conj(rh)).real
     k0x = 2.0*np.pi/lx
     knorm = k0x
     kxmax = nx / 2
@@ -111,7 +111,7 @@ def compute2Dspectrum(r,lx, ly, smooth):
     n = nx
     rh = fftn(r)/nt
     # calculate energy in fourier domain
-    tkeh = 0.5 * (rh * np.conj(rh)).real
+    tkeh = (rh * np.conj(rh)).real
     k0x = 2.0*np.pi/lx
     k0y = 2.0*np.pi/ly
     knorm = (k0x + k0y) / 2.0
@@ -165,7 +165,7 @@ def compute3Dspectrum(r,lx, ly, lz, smooth):
     n = nx
     rh = fftn(r)/nt
     # calculate energy in fourier domain
-    tkeh = 0.5 * (rh * np.conj(rh)).real
+    tkeh = (rh * np.conj(rh)).real
     k0x = 2.0*np.pi/lx
     k0y = 2.0*np.pi/ly
     k0z = 2.0*np.pi/lz
