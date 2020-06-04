@@ -55,7 +55,7 @@ class k41:
 # First case. let's assume 3-D
 # GRID RESOLUTION nx, ny, nz
 # Changing the grid resolution will change the maximum limit that the code resolves the spectrum.
-# As you increase the number of cells (e.g. 128,256,...) the code is able to resolve higher wavenumbers.
+# As you increase the number of cells (e.g. 128,256,...) the code is able to resolve higher wavenumbers but it takes LONGER TIME!
 nx = 64
 ny = 64
 nz = 64
@@ -64,6 +64,7 @@ lx = 1
 ly = 1
 lz = 1
 # NUMBER OF MODES
+# Increasing the number of modes, the accuracy should increases but it takes LONGER TIME!
 nmodes = 100
 # SPECIFY THE SPECTRUM THAT WE WANT
 # right now only kolmogorov -5/3
@@ -105,6 +106,10 @@ print("It took me ", computing_time, "to generate the 3D turbulence.")
 knyquist3D, wavenumbers3D, psdspec3D = cmpspec.compute3Dspectrum(r_xyz, lx, ly, lz, False)
 # save the generated spectrum to a text file for later post processing
 np.savetxt(pathfolder + '/3D_psdspec_' + filename3 + '.txt', np.transpose([wavenumbers3D, psdspec3D]))
+#
+#
+# EXPORT generated density field
+np.savez(pathfolder + '/3D_Density_Field_' + filename3 + '.npz', r_xyz)
 #
 print('mean field value: ', np.mean(r_xyz))
 print('max field value: ', np.max(r_xyz))
