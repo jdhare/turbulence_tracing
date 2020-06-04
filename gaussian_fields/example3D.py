@@ -48,6 +48,25 @@ class k41:
 		espec = pow(k,a)
 		return espec
 
+
+
+#  ____  ____  __ _  ____  __  ____  _  _    ____  __     __  __  ____ 
+# (    \(  __)(  ( \/ ___)(  )(_  _)( \/ )  (_  _)/  \   (  )/  \(  _ \
+#  ) D ( ) _) /    /\___ \ )(   )(   )  /     )( (  O )   )((  O ))   /
+# (____/(____)\_)__)(____/(__) (__) (__/     (__) \__/   (__)\__/(__\_)
+# This function convert the 3D electron density field in to 3D Index of Refraction (IOR) Field
+# Required parameters:
+# - laser wavelength
+# - electron density
+
+
+def computeIOR(n_e):
+	lambda_laser = 1.06 # [um] laser wavelength 
+	n_cr = (1.12 * 1e21)/lambda_laser**2 # Calculate the critical density
+	IOR = np.sqrt((1 - n_e/n_cr)) # calculate the index of refraction
+	return IOR
+
+
 #  ____      ____    ____  __  ____  __    ____ 
 # ( __ \ ___(    \  (  __)(  )(  __)(  )  (    \
 #  (__ ((___)) D (   ) _)  )(  ) _) / (_/\ ) D (
@@ -114,8 +133,11 @@ np.savez(pathfolder + '/3D_Density_Field_' + filename3 + '.npz', r_xyz)
 print('mean field value: ', np.mean(r_xyz))
 print('max field value: ', np.max(r_xyz))
 print('min field value: ', np.min(r_xyz))
-
-
+# Convert the 3D electron density field into the 3D Index of Refraction field
+IOR = computeIOR(r_xyz)
+# EXPORT the IOR field
+np.savez(pathfolder + '/3D_IOR_' + filename3 + '.npz', IOR)
+#
 #  ____  __     __  ____    ____  ____  ____  _  _  __   ____  ____  
 # (  _ \(  )   /  \(_  _)  (  _ \(  __)/ ___)/ )( \(  ) (_  _)/ ___) 
 #  ) __// (_/\(  O ) )(     )   / ) _) \___ \) \/ (/ (_/\ )(  \___ \ 
