@@ -54,6 +54,8 @@ class k41:
 # (____/    (____/  (__)  (__)(____)\____/(____/
 # First case. let's assume 3-D
 # GRID RESOLUTION nx, ny, nz
+# Changing the grid resolution will change the maximum limit that the code resolves the spectrum.
+# As you increase the number of cells (e.g. 128,256,...) the code is able to resolve higher wavenumbers.
 nx = 64
 ny = 64
 nz = 64
