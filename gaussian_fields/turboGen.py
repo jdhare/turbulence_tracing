@@ -385,7 +385,7 @@ def gaussian3Dcos(lx, ly, lz, nx, ny, nz, nmodes, wn1, especf):
     return _r
 
 
-def gaussian1D_FFT(L_drive, N, k_func):
+def gaussian1D_FFT(N, k_func):
     """A FFT based generator for scalar gaussian fields in 1D
     Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
      1–30. https://doi.org/10.1017/CBO9781107415324.004.
@@ -396,7 +396,6 @@ def gaussian1D_FFT(L_drive, N, k_func):
     Returns:
         signal {1D array of floats} -- a realisation of a 1D Gaussian process.
     Example:
-        N = 100
         L_drive = 1e-2
         def power_spectrum(k,a):
             return k**-a
@@ -404,15 +403,14 @@ def gaussian1D_FFT(L_drive, N, k_func):
         def k41(k):
             return power_spectrum(k, 5/3)        
         
-        sig = gaussian1D_FFT(L_drive, N, k41)
+        sig = gaussian1D_FFT( N, k41)
         
         fig,ax = plt.subplots()
-        x = np.linspace(-L_drive,L_drive, 2*N+1)
+        x = np.linspace(-N,N, 2*N+1)
         ax.plot(x, sig)
     """
     M=2*N+1
-    dx=L_drive/M
-    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+    k=np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
     K=np.sqrt(k**2)
     K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
@@ -435,7 +433,7 @@ def gaussian1D_FFT(L_drive, N, k_func):
     
     return signal.real
 
-def gaussian2D_FFT(L_drive, N, k_func):
+def gaussian2D_FFT(N, k_func):
     """A FFT based generator for scalar gaussian fields in 1D
     Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
      1–30. https://doi.org/10.1017/CBO9781107415324.004.
@@ -454,16 +452,15 @@ def gaussian2D_FFT(L_drive, N, k_func):
         def k41(k):
             return power_spectrum(k, 5/3)        
         
-        sig = gaussian2D_FFT(L_drive, N, k41)
+        sig = gaussian2D_FFT(N, k41)
         
         fig,ax=plt.subplots()
-        ax.imshow(sig, cmap='bwr', extent=[-L_drive,L_drive,-L_drive, L_drive])
+        ax.imshow(sig, cmap='bwr', extent=[-N,N,-N,N])
         
     """
 
     M=2*N+1
-    dx=L_drive/M
-    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+    k=np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
 
     KX,KY=np.meshgrid(k,k)
@@ -488,26 +485,24 @@ def gaussian2D_FFT(L_drive, N, k_func):
     
     return signal.real
 
-def gaussian3D_FFT(L_drive, N, k_func):
+def gaussian3D_FFT(N, k_func):
     """A FFT based generator for scalar gaussian fields in 1D
     Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
      1–30. https://doi.org/10.1017/CBO9781107415324.004.
     Arguments:
-        L_drive {float} -- Driving length scale
         N {int}  -- size of domain will be (2*N+1)^3
         k_func {function} -- a function which takes an input k 
     Returns:
         signal {3D array of floats} -- a realisation of a 3D Gaussian process.
     Example:
         N = 100
-        L_drive = 1e-2
         def power_spectrum(k,a):
             return k**-a
 
         def k41(k):
             return power_spectrum(k, 5/3)        
         
-        sig = gaussian3D_FFT(L_drive, N, k41)
+        sig = gaussian3D_FFT(N, k41)
         
         fig,ax=plt.subplots(3,3, figsize=(8,8), sharex=True, sharey=True)
         ax=ax.flatten()
@@ -515,19 +510,17 @@ def gaussian3D_FFT(L_drive, N, k_func):
         for a in ax:
             r=np.random.randint(0,ny)
             d=sig[r,:,:]
-            a.imshow(d, cmap='bwr', extent=[-L_drive,L_drive,-L_drive, L_drive])
+            a.imshow(d, cmap='bwr', extent=[-N,N,-N,N])
             a.set_title("y="+str(r))    """
-    M=2*N+1
-    dx=L_drive/M
-    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+    M = 2*N+1
+    k = np.fft.fftfreq(M) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
+    KX,KY,KZ = np.meshgrid(k,k,k)
+    K = np.sqrt(KX**2+KY**2+KZ**2)
+    K = np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
 
-    KX,KY,KZ=np.meshgrid(k,k,k)
-    K=np.sqrt(KX**2+KY**2+KZ**2)
-    K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
-
-    Wr=np.random.randn(M, M, M) # random number from Gaussian for both 
-    Wi=np.random.randn(M, M, M) # real and imaginary components
+    Wr = np.random.randn(M, M, M) # random number from Gaussian for both 
+    Wi = np.random.randn(M, M, M) # real and imaginary components
 
     Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
     Wi = Wi - np.flip(Wi)
@@ -536,10 +529,10 @@ def gaussian3D_FFT(L_drive, N, k_func):
 
     F = W*k_func(K)
 
-    F_shift=np.fft.ifftshift(F)
+    F_shift = np.fft.ifftshift(F)
 
-    F_shift[0,0,0]=0 # 0 mean
+    F_shift[0,0,0] = 0 # 0 mean
 
-    signal=np.fft.ifftn(F_shift)
+    signal = np.fft.ifftn(F_shift)
     
     return signal.real

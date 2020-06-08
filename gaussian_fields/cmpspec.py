@@ -179,9 +179,9 @@ def compute3Dspectrum(r,lx, ly, lz, smooth):
     for kx in range(-nx//2, nx//2-1):
        for ky in range(-ny//2, ny//2-1):
            for kz in range(-nz//2, nz//2-1):
-            rk = np.sqrt(kx**2 + ky**2 + kz**2)
-            k = int(np.round(rk))
-            tke_spectrum[k] = tke_spectrum[k] + tkeh[kx, ky, kz]
+               rk = np.sqrt(kx**2 + ky**2 + kz**2)
+               k = int(np.round(rk))
+               tke_spectrum[k] = tke_spectrum[k] + tkeh[kx, ky, kz]
     tke_spectrum = tke_spectrum/knorm
     knyquist = knorm * min(nx, ny, nz) / 2
     # If smooth parameter is TRUE: Smooth the computed spectrum
