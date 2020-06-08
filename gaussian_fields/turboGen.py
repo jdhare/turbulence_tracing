@@ -385,96 +385,129 @@ def gaussian3Dcos(lx, ly, lz, nx, ny, nz, nmodes, wn1, especf):
     return _r
 
 
-def gaussian1D_FFT(nx,a):
+def gaussian1D_FFT(L_drive, N, k_func):
     """A FFT based generator for scalar gaussian fields in 1D
     Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
      1–30. https://doi.org/10.1017/CBO9781107415324.004.
     Arguments:
-        nx {int} -- number of points in positive x direction
-        a {float} -- power law index, a=-5/3 for Kolmogorov, S(k)=k**a
+        L_drive {float} -- Driving length scale
+        N {int}  -- size of domain will be (2*N+1)
+        k_func {function} -- a function which takes an input k 
     Returns:
-        x {1D array of integers} -- a zero-mean array of integers, length 2*nx+1
-        signal {1D array of float} -- a realisation of a 1D gaussian process with power law k**a.
+        signal {1D array of floats} -- a realisation of a 1D Gaussian process.
     Example:
-        x = np.linspace(0,10,1001)
-        x, sig = gaussian1D_FFT(x,a = -11/3)
-        fig,ax=plt.subplots()
-        ax.plot(x,sig)
+        N = 100
+        L_drive = 1e-2
+        def power_spectrum(k,a):
+            return k**-a
+
+        def k41(k):
+            return power_spectrum(k, 5/3)        
+        
+        sig = gaussian1D_FFT(L_drive, N, k41)
+        
+        fig,ax = plt.subplots()
+        x = np.linspace(-L_drive,L_drive, 2*N+1)
+        ax.plot(x, sig)
     """
-    x = np.arange(-nx, nx+1, 1)
-    k=np.fft.fftfreq(x.size, d=1) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-    k_pos=k[:k.size//2] #take the positive wavenumbers only - our desired signal is real, so the FT is hermitian
+    M=2*N+1
+    dx=L_drive/M
+    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
-    kr=np.random.randn(k_pos.size) # random number from Gaussian for both 
-    ki=np.random.randn(k_pos.size) # real and imaginary components
-
-    F=(kr+1j*ki)*k_pos**(a/2) # colour the initially white noise with the power spectrum
-    F[0]=0 # set 0 wavenumber to 0, so mean (DC) value is 0.
-
-    #our desired signal is real, so we can use a hermitian FFT to get the output.
-    # we could also create the negative frequencies as the complex conjugate of the positive frequencies
-    # and then use the full Fourier transform, but there's no need.
-    signal=np.fft.hfft(F, n=x.size) # specify n to ensure correct size of output
-
-    return x, signal 
-
-def gaussian2D_FFT(nx, ny, a, dx=1, dy=1):
-    """A FFT based generator for scalar gaussian fields in 1D
-    Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
-     1–30. https://doi.org/10.1017/CBO9781107415324.004.
-    Arguments:
-        nx {int} -- number of points in positive x direction
-        ny {int} -- number of points in positive y direction
-        a {float} -- power law index, a=-5/3 for Kolmogorov, S(k)=k**a
-    Returns:
-        signal {2D array of float} -- a realisation of a 2D gaussian process with power law k**a.
-    Example:
-        sig = gaussian2D_FFT(nx = 100, ny=121, a = -11/3)
-        fig,ax=plt.subplots()
-        ax.imshow(sig, cmap='bwr', extent=[-ny,ny,-nx,nx])
-    """
-    kx=np.fft.fftfreq(2*nx+1, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-    ky=np.fft.fftfreq(2*ny+1, d=dy) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-
-    KX,KY=np.meshgrid(kx,ky)
-    K=np.sqrt(KX**2+KY**2)
+    K=np.sqrt(k**2)
     K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
 
-    Wr=np.random.randn(2*ny+1, 2*nx+1) # random number from Gaussian for both 
-    Wi=np.random.randn(2*ny+1, 2*nx+1) # real and imaginary components
+    Wr=np.random.randn(M) # random number from Gaussian for both 
+    Wi=np.random.randn(M) # real and imaginary components
 
     Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
     Wi = Wi - np.flip(Wi)
 
     W = Wr+1j*Wi
 
-    F = W*K**(a/2) #colour the white noise
-    F[ny,nx]=0
+    F = W*k_func(K)
+
+    F_shift=np.fft.ifftshift(F)
+
+    F_shift[0]=0 # 0 mean
+
+    signal=np.fft.ifftn(F_shift)
+    
+    return signal.real
+
+def gaussian2D_FFT(L_drive, N, k_func):
+    """A FFT based generator for scalar gaussian fields in 1D
+    Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
+     1–30. https://doi.org/10.1017/CBO9781107415324.004.
+    Arguments:
+        L_drive {float} -- Driving length scale
+        N {int}  -- size of domain will be (2*N+1)^2
+        k_func {function} -- a function which takes an input k 
+    Returns:
+        signal {2D array of floats} -- a realisation of a 2D Gaussian process.
+    Example:
+        N = 100
+        L_drive = 1e-2
+        def power_spectrum(k,a):
+            return k**-a
+
+        def k41(k):
+            return power_spectrum(k, 5/3)        
+        
+        sig = gaussian2D_FFT(L_drive, N, k41)
+        
+        fig,ax=plt.subplots()
+        ax.imshow(sig, cmap='bwr', extent=[-L_drive,L_drive,-L_drive, L_drive])
+        
+    """
+
+    M=2*N+1
+    dx=L_drive/M
+    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+
+
+    KX,KY=np.meshgrid(k,k)
+    K=np.sqrt(KX**2+KY**2)
+    K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
+
+    Wr=np.random.randn(M, M) # random number from Gaussian for both 
+    Wi=np.random.randn(M, M) # real and imaginary components
+
+    Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
+    Wi = Wi - np.flip(Wi)
+
+    W = Wr+1j*Wi
+
+    F = W*k_func(K)
 
     F_shift=np.fft.ifftshift(F)
 
     F_shift[0,0]=0 # 0 mean
 
-    signal=np.fft.ifft2(F_shift)
+    signal=np.fft.ifftn(F_shift)
     
     return signal.real
 
-def gaussian3D_FFT(nx, ny, nz, a, dx=1, dy=1, dz=1):
+def gaussian3D_FFT(L_drive, N, k_func):
     """A FFT based generator for scalar gaussian fields in 1D
     Reference:Timmer, J and König, M. “On Generating Power Law Noise.” Astronomy & Astrophysics 300 (1995):
      1–30. https://doi.org/10.1017/CBO9781107415324.004.
     Arguments:
-        nx {int} -- number of points in positive x direction
-        ny {int} -- number of points in positive y direction
-        ny {int} -- number of points in positive z direction
-        a {float} -- power law index, a=-5/3 for Kolmogorov, S(k)=k**a
+        L_drive {float} -- Driving length scale
+        N {int}  -- size of domain will be (2*N+1)^3
+        k_func {function} -- a function which takes an input k 
     Returns:
-        signal {3D array of float} -- a realisation of a 3D gaussian process with power law k**a.
+        signal {3D array of floats} -- a realisation of a 3D Gaussian process.
     Example:
-        nx = 100
-        ny = 121
-        nz = 50
-        sig = gaussian3D_FFT(nx, ny, nz, a = -8/3)
+        N = 100
+        L_drive = 1e-2
+        def power_spectrum(k,a):
+            return k**-a
+
+        def k41(k):
+            return power_spectrum(k, 5/3)        
+        
+        sig = gaussian3D_FFT(L_drive, N, k41)
         
         fig,ax=plt.subplots(3,3, figsize=(8,8), sharex=True, sharey=True)
         ax=ax.flatten()
@@ -482,26 +515,26 @@ def gaussian3D_FFT(nx, ny, nz, a, dx=1, dy=1, dz=1):
         for a in ax:
             r=np.random.randint(0,ny)
             d=sig[r,:,:]
-            a.imshow(d, cmap='bwr', extent=[-ny,ny,-nx,nx])
+            a.imshow(d, cmap='bwr', extent=[-L_drive,L_drive,-L_drive, L_drive])
             a.set_title("y="+str(r))    """
-    kx=np.fft.fftfreq(2*nx+1, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-    ky=np.fft.fftfreq(2*ny+1, d=dy) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
-    kz=np.fft.fftfreq(2*nz+1, d=dz) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
+    M=2*N+1
+    dx=L_drive/M
+    k=np.fft.fftfreq(M, d=dx) #these are the frequencies, starting from 0 up to f_max, then -f_max to 0.
 
 
-    KX,KY, KZ=np.meshgrid(kx,ky, kz)
+    KX,KY,KZ=np.meshgrid(k,k,k)
     K=np.sqrt(KX**2+KY**2+KZ**2)
     K=np.fft.fftshift(K)#numpy convention, highest frequencies at the centre
 
-    Wr=np.random.randn(2*ny+1, 2*nx+1, 2*nz+1) # random number from Gaussian for both 
-    Wi=np.random.randn(2*ny+1, 2*nx+1, 2*nz+1) # real and imaginary components
+    Wr=np.random.randn(M, M, M) # random number from Gaussian for both 
+    Wi=np.random.randn(M, M, M) # real and imaginary components
 
     Wr = Wr + np.flip(Wr) #f(-k)=f*(k)
     Wi = Wi - np.flip(Wi)
 
     W = Wr+1j*Wi
 
-    F = W*K**(a/2) #colour the white noise
+    F = W*k_func(K)
 
     F_shift=np.fft.ifftshift(F)
 
