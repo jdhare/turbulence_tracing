@@ -423,7 +423,7 @@ def gaussian1D_FFT(N, k_func):
 
     W = Wr+1j*Wi
 
-    F = W*k_func(K)
+    F = W*np.sqrt(k_func(K)) # power spectra follows power law, so sqrt here.
 
     F_shift=np.fft.ifftshift(F)
 
@@ -475,7 +475,7 @@ def gaussian2D_FFT(N, k_func):
 
     W = Wr+1j*Wi
 
-    F = W*k_func(K)
+    F = W*np.sqrt(k_func(K)) # power spectra follows power law, so sqrt here.
 
     F_shift=np.fft.ifftshift(F)
 
@@ -527,7 +527,7 @@ def gaussian3D_FFT(N, k_func):
 
     W = Wr+1j*Wi
 
-    F = W*k_func(K)
+    F = W*np.sqrt(k_func(K)) # power spectra follows power law, so sqrt here.
 
     F_shift = np.fft.ifftshift(F)
 
