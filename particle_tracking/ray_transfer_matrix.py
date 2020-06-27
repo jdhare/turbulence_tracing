@@ -295,8 +295,8 @@ class BurdiscopeRays(Rays):
         r2=circular_aperture(self.R, rr2) # second lens cutoff
 
         rr3=transform(O.X3(self.L), r2) #detector
-        r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
-        self.rf=r3
+        #3=rect_aperture(self.Lx/2,self.Ly/2,rr3) # detector cutoff
+        self.rf=rr3
         
 class ShadowgraphyRays(Rays):
     '''
@@ -314,8 +314,8 @@ class ShadowgraphyRays(Rays):
         r2=circular_aperture(self.R, rr2) # cut off
 
         rr3=transform(O.X3(self.L), r2) #detector
-        r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
-        self.rf=r3
+        #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
+        self.rf=rr3
         
 class SchlierenRays(Rays):
     '''
@@ -336,5 +336,5 @@ class SchlierenRays(Rays):
         r2=circular_aperture(self.R, rr2) #cut off
 
         rr3=transform(O.X3(self.L), r2) #detector
-        r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
-        self.rf=r3
+        #r3=rect_aperture(self.Lx/2,self.Ly/2,rr3) #cut off
+        self.rf=rr3

@@ -164,10 +164,12 @@ class GridTracer:
         fig,ax=plt.subplots(3,3, figsize=(8,8), sharex=True, sharey=True)
         ax=ax.flatten()
 
+        sc=self.scale/2
+
         for i, a in enumerate(ax):
             r=(2*self.N+1)*i//9
             d=self.ne_grid[r,:,:]
-            a.imshow(d, cmap='bwr', extent=[-self.scale,self.scale,-self.scale, self.scale])
+            a.imshow(d, cmap='bwr', extent=[-sc,sc,-sc, sc])
             a.set_title("z="+str(round(self.z[r])))
             
         return fig, ax
