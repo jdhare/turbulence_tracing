@@ -243,6 +243,7 @@ class ElectronCube:
         Np = s0.size//6
         self.sf = sol.y[:,-1].reshape(6,Np)
         self.rf = find_angles(self.sf, self.extent)
+        return self.rf
     
 # ODEs of photon paths
 def dsdt(t, s, ElectronCube):
