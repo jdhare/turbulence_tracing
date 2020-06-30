@@ -12,6 +12,8 @@ REFACTORING: Jack HARE
 EXAMPLES:
 #############################
 #NULL TEST: no deflection
+import particle_tracker as pt
+
 N_V = 100
 M_V = 2*N_V+1
 ne_extent = 5.0e-3
@@ -46,9 +48,11 @@ fig.tight_layout()
 
 ###########################
 #SLAB TEST: Deflect rays in -ve x-direction
+import particle_tracker as pt
+
 N_V = 100
 M_V = 2*N_V+1
-ne_extent = 5.0e-3
+ne_extent = 6.0e-3
 ne_x = np.linspace(-ne_extent,ne_extent,M_V)
 ne_y = np.linspace(-ne_extent,ne_extent,M_V)
 ne_z = np.linspace(-ne_extent,ne_extent,M_V)
