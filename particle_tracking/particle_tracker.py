@@ -1,10 +1,89 @@
+"""PARTICLE TRACKER
+BASED ON: https://journals.aps.org/pre/abstract/10.1103/PhysRevE.61.895
+
+SOLVES: 
+$ \frac{d\vec{v}}{dt} = -\nabla \left( \frac{c^2}{2} \frac{n_e}{n_c} \right) $
+
+$ \frac{d\vec{x}}{dt} = \vec{v} $
+
+CODE BY: Aidan CRILLY
+REFACTORING: Jack HARE
+
+EXAMPLES:
+#############################
+#NULL TEST: no deflection
+N_V = 100
+M_V = 2*N_V+1
+ne_extent = 5.0e-3
+ne_x = np.linspace(-ne_extent,ne_extent,M_V)
+ne_y = np.linspace(-ne_extent,ne_extent,M_V)
+ne_z = np.linspace(-ne_extent,ne_extent,M_V)
+
+null = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
+null.test_null()
+null.calc_dndr()
+
+### Initialise rays
+s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0.5e-3, ne_extent = ne_extent)
+### solve
+null.solve(s0)
+rf = null.rf
+
+### Plot
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
+nbins = 201
+
+_,_,_,im1 = ax1.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+plt.colorbar(im1,ax=ax1)
+ax1.set_xlabel("x (mm)")
+ax1.set_ylabel("y (mm)")
+_,_,_,im2 = ax2.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+plt.colorbar(im2,ax=ax2)
+ax2.set_xlabel(r"$\theta$ (mrad)")
+ax2.set_ylabel(r"$\phi$ (mrad)")
+
+fig.tight_layout()
+
+###########################
+#SLAB TEST: Deflect rays in -ve x-direction
+N_V = 100
+M_V = 2*N_V+1
+ne_extent = 5.0e-3
+ne_x = np.linspace(-ne_extent,ne_extent,M_V)
+ne_y = np.linspace(-ne_extent,ne_extent,M_V)
+ne_z = np.linspace(-ne_extent,ne_extent,M_V)
+
+slab = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
+slab.test_slab(s=10, n_e0=1e25)
+slab.calc_dndr()
+
+## Initialise rays and solve
+s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0, ne_extent = ne_extent)
+slab.solve(s0)
+rf = slab.rf
+
+## Plot
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
+nbins = 201
+
+_,_,_,im1 = ax1.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+plt.colorbar(im1,ax=ax1)
+ax1.set_xlabel("x (mm)")
+ax1.set_ylabel("y (mm)")
+_,_,_,im2 = ax2.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+plt.colorbar(im2,ax=ax2)
+ax2.set_xlabel(r"$\theta$ (mrad)")
+ax2.set_ylabel(r"$\phi$ (mrad)")
+
+fig.tight_layout()
+"""
+
 import numpy as np
 from scipy.integrate import odeint,solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 from time import time
 
 c = 299792458 # honestly, this could be 3e8 *shrugs*
-
 
 class ElectronCube:
     """A class to hold and generate electron density cubes
@@ -163,6 +242,16 @@ class ElectronCube:
     
 # ODEs of photon paths
 def dsdt(t, s, ElectronCube):
+    """Returns an array with the gradients and velocity per ray for ode_int
+
+    Args:
+        t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
+        s (6N float array): flattened 6xN array of rays used by ode_int
+        ElectronCube (ElectronCube): an ElectronCube object which can calculate gradients
+
+    Returns:
+        6N float array: flattened array for ode_int
+    """
     Np = s.size//6
     s = s.reshape(6,Np)
     r = np.zeros_like(s)
