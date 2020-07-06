@@ -47,7 +47,7 @@ beam_size = 5e-3 # 5 mm
 divergence = 0.05e-3 #0.05 mrad, realistic
 
 ## Create num_processors bundles of Np rays for solving separately
-ss = [pt.init_beam(Np = Np, beam_size=5e-3, divergence = 0.05e-3, ne_extent = ne_extent) for i in range(8)]
+ss = [pt.init_beam(Np = Np, beam_size=5e-3, divergence = 0.05e-3, ne_extent = ne_extent) for i in range(num_processors)]
 output = p.map(sin.solve, ss) # output of solve is the rays in (x, theta, y, phi) format
 
 ## Combine output
