@@ -113,10 +113,6 @@ class ElectronCube:
         self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
         self.extent = extent
         
-        self.XX_ravel = self.XX.ravel()
-        self.YY_ravel = self.YY.ravel()
-        self.ZZ_ravel = self.ZZ.ravel()
-        
     def test_null(self):
         """
         Null test, an empty cube
@@ -230,7 +226,7 @@ class ElectronCube:
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
-        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,10)
+        t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
         s0 = s0.flatten() #odeint insists
 
@@ -244,6 +240,21 @@ class ElectronCube:
         self.sf = sol.y[:,-1].reshape(6,Np)
         self.rf = find_angles(self.sf, self.extent)
         return self.rf
+
+    def clear_memory(self):
+        """
+        Clears variables not needed by solve method, saving memory
+
+        Can also use after calling solve to clear ray positions - important when running large number of rays
+
+        """
+        self.dndx = None
+        self.dndx = None
+        self.dndx = None
+        self.ne = None
+        self.ne_nc = None
+        self.sf = None
+        self.rf = None
     
 # ODEs of photon paths
 def dsdt(t, s, ElectronCube):

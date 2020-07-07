@@ -254,7 +254,7 @@ class Rays:
             Ly (float, optional): Detector size in y. Defaults to 13.5.
         """        
         self.r0, self.L, self.R, self.Lx, self.Ly = r0, L, R, Lx, Ly
-    def histogram(self, bin_scale=10, pix_x=3448, pix_y=2574):
+    def histogram(self, bin_scale=10, pix_x=3448, pix_y=2574, clear_mem=False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
         Outputs are H, the histogram, and xedges and yedges, the bin edges.
 
@@ -269,15 +269,25 @@ class Rays:
         x=x[~np.isnan(x)]
         y=y[~np.isnan(y)]
 
-        H, xedges, yedges = np.histogram2d(x, y, 
+        self.H, self.xedges, self.yedges = np.histogram2d(x, y, 
                                            bins=[pix_x//bin_scale, pix_y//bin_scale], 
                                            range=[[-self.Lx/2, self.Lx/2],[-self.Ly/2,self.Ly/2]])
-        self.H=H.T
-        self.xedges=xedges
-        self.yedges=yedges       
+        self.H = self.H.T
+
+        # Optional - clear ray attributes to save memory
+        if(clear_mem):
+            self.clear_rays()
+
     def plot(self, ax, clim=None, cmap=None):
         ax.imshow(self.H, interpolation='nearest', origin='low', clim=clim, cmap=cmap,
                 extent=[self.xedges[0], self.xedges[-1], self.yedges[0], self.yedges[-1]])
+
+    def clear_rays(self):
+        '''
+        Clears the r0 and rf variables to save memory
+        '''
+        self.r0 = None
+        self.rf = None
 
 class BurdiscopeRays(Rays):
     '''
