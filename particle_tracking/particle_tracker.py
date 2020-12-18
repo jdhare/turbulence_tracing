@@ -86,14 +86,15 @@ import numpy as np
 from scipy.integrate import odeint,solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 from time import time
+import scipy.constants as sc
 
-c = 299792458 # honestly, this could be 3e8 *shrugs*
+c = sc.c # honestly, this could be 3e8 *shrugs*
 
 class ElectronCube:
     """A class to hold and generate electron density cubes
     """
     
-    def __init__(self, x, y, z, extent):
+    def __init__(self, x, y, z, extent, B_on = False):
         """
         Example:
             N_V = 100
@@ -112,6 +113,7 @@ class ElectronCube:
         self.z,self.y,self.x = z, y, x
         self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
         self.extent = extent
+        self.B_on = B_on
         
     def test_null(self):
         """
@@ -160,6 +162,16 @@ class ElectronCube:
         """
         self.ne = ne
         
+    def test_B(self, Bmax=1.0):
+        """A Bz field with a linear gradient in x:
+        Bz =  Bmax*x/extent
+
+        Args:
+            Bmax ([type], optional): maximum B field, default 1.0 T
+        """
+        self.B          = np.zeros(np.append(np.array(self.XX.shape),3))
+        self.B[:,:,:,2] = Bmax*self.XX/self.extent
+
     def calc_dndr(self, lwl=1053e-9):
         """Generate interpolators for derivatives.
 
@@ -169,6 +181,10 @@ class ElectronCube:
 
         omega = 2*np.pi*(c/lwl)
         nc = 3.14207787e-4*omega**2
+
+        # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
+        if (self.B_on):
+            self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
 
         self.ne_nc = self.ne/nc #normalise to critical density
         
@@ -180,7 +196,16 @@ class ElectronCube:
         self.dndx_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndz, bounds_error = False, fill_value = 0.0)
-        
+
+    def set_up_interps(self):
+        # Electron density
+        self.ne_interp = RegularGridInterpolator((self.x, self.y, self.z), self.ne, bounds_error = False, fill_value = 0.0)
+        # Magnetic field
+        if(self.B_on):
+            self.Bx_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
+            self.By_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
+            self.Bz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+
     def plot_midline_gradients(self,ax,probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
 
@@ -221,6 +246,32 @@ class ElectronCube:
         grad[2,:] = self.dndz_interp(x.T)
         return grad
 
+    def get_ne(self,x):
+        return self.ne_interp(x.T)
+
+    def get_B(self,x):
+        B = np.array([self.Bx_interp(x.T),self.By_interp(x.T),self.Bz_interp(x.T)])
+        return B
+
+    def neB(self,x,v):
+        """returns the VerdetConst ne B.v
+
+        Args:
+            x (3xN float): N [x,y,z] locations
+            v (3xN float): N [vx,vy,vz] velocities
+
+        Returns:
+            N float: N values of ne B.v
+        """
+        if(self.B_on):
+            ne_N = self.get_ne(x)
+            Bv_N = np.sum(self.get_B(x)*v,axis=0)
+            pol  = self.VerdetConst*ne_N*Bv_N
+        else:
+            pol = 0.0
+
+        return pol
+
     def solve(self, s0):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
@@ -236,9 +287,9 @@ class ElectronCube:
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
-        Np = s0.size//6
-        self.sf = sol.y[:,-1].reshape(6,Np)
-        self.rf = find_angles(self.sf, self.extent)
+        Np = s0.size//9
+        self.sf = sol.y[:,-1].reshape(9,Np)
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent)
         return self.rf
 
     def clear_memory(self):
@@ -262,21 +313,29 @@ def dsdt(t, s, ElectronCube):
 
     Args:
         t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
-        s (6N float array): flattened 6xN array of rays used by ode_int
+        s (9N float array): flattened 9xN array of rays used by ode_int
         ElectronCube (ElectronCube): an ElectronCube object which can calculate gradients
 
     Returns:
-        6N float array: flattened array for ode_int
+        9N float array: flattened array for ode_int
     """
-    Np = s.size//6
-    s = s.reshape(6,Np)
-    r = np.zeros_like(s)
-    v = s[3:,:]
+    Np     = s.size//9
+    s      = s.reshape(9,Np)
+    sprime = np.zeros_like(s)
+    # Velocity and position
+    v = s[3:6,:]
     x = s[:3,:]
-    
-    r[3:,:] = ElectronCube.dndr(x)
-    r[:3,:] = v
-    return r.flatten()
+    # Amplitude, phase and polarisation
+    a = s[6,:]
+    p = s[7,:]
+    r = s[8,:]
+
+    sprime[3:6,:] = ElectronCube.dndr(x)
+    sprime[:3,:]  = v
+    sprime[6,:]   = 0.0
+    sprime[7,:]   = 0.0
+    sprime[8,:]   = ElectronCube.neB(x,v)
+    return sprime.flatten()
 
 def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
     """[summary]
@@ -289,9 +348,9 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         probing_direction (str): direction of probing. I suggest 'z', the best tested
 
     Returns:
-        s0, 6 x N float: N photons with (x, y, z, vx, vy, vz) in m, m/s.
+        s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
     """
-    s0 = np.zeros((6,Np))
+    s0 = np.zeros((9,Np))
     # position, uniformly within a circle
     t  = 2*np.pi*np.random.rand(Np) #polar angle of position
     u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
@@ -337,15 +396,20 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         s0[0,:] = beam_size*u*np.cos(t)
         s0[1,:] = -ne_extent
         s0[2,:] = beam_size*u*np.sin(t)
+
+    # Initialise amplitude, phase and polarisation
+    s0[6,:] = 1.0
+    s0[7,:] = 0.0
+    s0[8,:] = 0.0
     return s0
 
 # Need to backproject to ne volume, then find angles
-def find_angles(ode_sol, ne_extent, probing_direction = 'z'):
-    """Takes the output from the 6D solver and returns 4D rays for ray-transfer matrix techniques.
+def ray_to_Jonesvector(ode_sol, ne_extent, probing_direction = 'z'):
+    """Takes the output from the 9D solver and returns 6D rays for ray-transfer matrix techniques.
     Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
 
     Args:
-        ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s
+        ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
         ne_extent (float): edge length of cube, m
         probing_direction (str): x, y or z.
 
@@ -354,9 +418,11 @@ def find_angles(ode_sol, ne_extent, probing_direction = 'z'):
     """
     Np = ode_sol.shape[1] # number of photons
     ray_p = np.zeros((4,Np))
+    ray_J = np.zeros((2,Np),dtype=np.complex)
 
     x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
 
+    # Resolve distances and angles
     # YZ plane
     if(probing_direction == 'x'):
         t_bp = (x-ne_extent)/vx
@@ -384,4 +450,18 @@ def find_angles(ode_sol, ne_extent, probing_direction = 'z'):
         # Angles to plane
         ray_p[1] = np.arctan(vx/vz)
         ray_p[3] = np.arctan(vy/vz)
-    return ray_p
+
+    # Resolve Jones vectors
+    amp,phase,pol = ode_sol[6], ode_sol[7], ode_sol[8]
+    # Assume initially polarised along y
+    E_x_init = np.zeros(Np)
+    E_y_init = np.ones(Np)
+    # Perform rotation for polarisation, multiplication for amplitude, and complex rotation for phase
+    ray_J[0] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.cos(pol)*E_x_init-np.sin(pol)*E_y_init)
+    ray_J[1] = amp*(np.cos(phase)+1.0j*np.sin(phase))*(np.sin(pol)*E_x_init+np.cos(pol)*E_y_init)
+
+    # ray_p [x,phi,y,theta], ray_J [E_x,E_y]
+
+    return ray_p,ray_J
+
+
