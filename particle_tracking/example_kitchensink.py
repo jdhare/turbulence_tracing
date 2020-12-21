@@ -42,8 +42,8 @@ Np  = int(1e5)
 print("Loading data...")
 vti_file = "./data/x08_rnec-400.pvti"
 rnec,dim,spacing = pvti_readin(vti_file)
-vti_file = "./data/x08_Te-300.pvti"
-Te,dim,spacing = pvti_readin(vti_file)
+#vti_file = "./data/x08_Te-300.pvti"
+#Te,dim,spacing = pvti_readin(vti_file)
 vti_file = "./data/x08_Bvec-400.pvti"
 Bvec,dim,spacing = pvti_readin(vti_file)
 # Probing direction is along y
@@ -58,7 +58,7 @@ ne_extent = 2*spacing[1]*((M_V-1)/2)
 ne_y = np.linspace(-ne_extent,ne_extent,M_V)
 
 rnec = rnec[-2*M_V1::2,::2,::2]
-Te   = Te[-2*M_V1::2,::2,::2]
+#Te   = Te[-2*M_V1::2,::2,::2]
 Bvec = Bvec[-2*M_V1::2,::2,::2,:]
 
 print("Data loaded...")
@@ -69,39 +69,11 @@ ax2 = fig.add_subplot(222)
 ax3 = fig.add_subplot(223)
 ax4 = fig.add_subplot(224)
 
-ax1.set_title(r"$n_e$")
-im1 = ax1.imshow(rnec[:,rnec.shape[1]//2,:])
-fig.colorbar(im1,ax=ax1,orientation='horizontal')
-np.savetxt('ne_slice.dat',rnec[:,rnec.shape[1]//2,:])
-
-ax2.set_title(r"$B_z$")
-im2 = ax2.imshow(Bvec[:,rnec.shape[1]//2,:,1],cmap='jet',vmin=-5)
-fig.colorbar(im2,ax=ax2,orientation='horizontal')
-np.savetxt('Bz_slice.dat',Bvec[:,Bvec.shape[1]//2,:,1])
-
-ax3.set_title(r"$n_eL$")
-neL = np.sum(2*spacing[1]*rnec[:,:,:],axis=1)
-im3 = ax3.imshow(neL)
-fig.colorbar(im3,ax=ax3,orientation='horizontal')
-np.savetxt('neL.dat',neL)
-
-ax4.set_title(r"$n_eB_zL/n_eL$")
-neBL = np.sum(2*spacing[1]*rnec[:,:,:]*Bvec[:,:,:,1],axis=1)
-im4 = ax4.imshow(neBL/neL,cmap='jet')
-fig.colorbar(im4,ax=ax4,orientation='horizontal')
-np.savetxt('neBL.dat',neBL)
-
-plt.show()
-
-from sys import exit
-exit()
-
-
-test = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent,B_on=True,inv_brems=True,phaseshift=True, probing_direction = 'y')
+test = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent,B_on=True,inv_brems=False,phaseshift=True, probing_direction = 'y')
 
 test.external_ne(rnec)
-test.external_Te(Te)
-test.external_Z(1.0)
+#test.external_Te(Te)
+#test.external_Z(1.0)
 test.external_B(Bvec)
 test.calc_dndr()
 test.set_up_interps()
