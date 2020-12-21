@@ -94,7 +94,7 @@ class ElectronCube:
     """A class to hold and generate electron density cubes
     """
     
-    def __init__(self, x, y, z, extent, B_on = False):
+    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
         """
         Example:
             N_V = 100
@@ -113,7 +113,11 @@ class ElectronCube:
         self.z,self.y,self.x = z, y, x
         self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
         self.extent = extent
-        self.B_on = B_on
+        self.probing_direction = probing_direction
+        # Logical switches
+        self.B_on       = B_on
+        self.inv_brems  = inv_brems
+        self.phaseshift = phaseshift
         
     def test_null(self):
         """
@@ -161,6 +165,30 @@ class ElectronCube:
             ne ([type]): MxMxM grid of density in m^-3
         """
         self.ne = ne
+
+    def external_B(self, B):
+        """Load externally generated grid
+
+        Args:
+            B ([type]): MxMxMx3 grid of B field in T
+        """
+        self.B = B
+
+    def external_Te(self, Te, Te_min = 1.0):
+        """Load externally generated grid
+
+        Args:
+            Te ([type]): MxMxM grid of electron temperature in eV
+        """
+        self.Te = np.maximum(Te_min,Te)
+
+    def external_Z(self, Z):
+        """Load externally generated grid
+
+        Args:
+            Z ([type]): MxMxM grid of ionisation
+        """
+        self.Z = Z
         
     def test_B(self, Bmax=1.0):
         """A Bz field with a linear gradient in x:
@@ -179,8 +207,8 @@ class ElectronCube:
             lwl (float, optional): laser wavelength. Defaults to 1053e-9 m.
         """
 
-        omega = 2*np.pi*(c/lwl)
-        nc = 3.14207787e-4*omega**2
+        self.omega = 2*np.pi*(c/lwl)
+        nc = 3.14207787e-4*self.omega**2
 
         # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
         if (self.B_on):
@@ -197,6 +225,40 @@ class ElectronCube:
         self.dndy_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndz, bounds_error = False, fill_value = 0.0)
 
+    # NRL formulary inverse brems - cheers Jack Halliday for coding in Python
+    # Converted to rate coefficient by multiplying by group velocity in plasma
+    def kappa(self):
+        # Useful subroutines
+        def omega_pe(ne):
+            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+            return 5.64e4*np.sqrt(ne)
+        def v_the(Te):
+            '''Calculate electron thermal speed. Provide Te in eV. Retrurns result in m/s'''
+            return 4.19e5*np.sqrt(Te)
+        def V(ne, Te, Z, omega):
+            o_pe  = omega_pe(ne)
+            o_max = np.copy(o_pe)
+            o_max[o_pe < omega] = omega
+            L_classical = Z*sc.e/Te
+            L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
+            L_max = np.maximum(L_classical, L_quantum)
+            return o_max*L_max
+        def coloumbLog(ne, Te, Z, omega):
+            return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
+        ne_cc = self.ne*1e-6
+        o_pe  = omega_pe(ne_cc)
+        CL    = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
+        return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
+
+    # Plasma refractive index
+    def n_refrac(self):
+        def omega_pe(ne):
+            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
+            return 5.64e4*np.sqrt(ne)
+        ne_cc = self.ne*1e-6
+        o_pe  = omega_pe(ne_cc)
+        return np.sqrt(1.0-(o_pe/self.omega)**2)
+
     def set_up_interps(self):
         # Electron density
         self.ne_interp = RegularGridInterpolator((self.x, self.y, self.z), self.ne, bounds_error = False, fill_value = 0.0)
@@ -205,6 +267,12 @@ class ElectronCube:
             self.Bx_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,0], bounds_error = False, fill_value = 0.0)
             self.By_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,1], bounds_error = False, fill_value = 0.0)
             self.Bz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.B[:,:,:,2], bounds_error = False, fill_value = 0.0)
+        # Inverse Bremsstrahlung
+        if(self.inv_brems):
+            self.kappa_interp = RegularGridInterpolator((self.x, self.y, self.z), self.kappa(), bounds_error = False, fill_value = 0.0)
+        # Phase shift
+        if(self.phaseshift):
+            self.refractive_index_interp = RegularGridInterpolator((self.x, self.y, self.z), self.n_refrac(), bounds_error = False, fill_value = 1.0)
 
     def plot_midline_gradients(self,ax,probing_direction):
         """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
@@ -245,6 +313,20 @@ class ElectronCube:
         grad[1,:] = self.dndy_interp(x.T)
         grad[2,:] = self.dndz_interp(x.T)
         return grad
+
+    # Attenuation due to inverse bremsstrahlung
+    def atten(self,x):
+        if(self.inv_brems):
+            return self.kappa_interp(x.T)
+        else:
+            return 0.0
+
+    # Phase shift introduced by refractive index
+    def phase(self,x):
+        if(self.phaseshift):
+            return self.omega*(self.refractive_index_interp(x.T)-1.0)
+        else:
+            return 0.0
 
     def get_ne(self,x):
         return self.ne_interp(x.T)
@@ -289,7 +371,7 @@ class ElectronCube:
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
-        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent)
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
         return self.rf
 
     def clear_memory(self):
@@ -332,8 +414,8 @@ def dsdt(t, s, ElectronCube):
 
     sprime[3:6,:] = ElectronCube.dndr(x)
     sprime[:3,:]  = v
-    sprime[6,:]   = 0.0
-    sprime[7,:]   = 0.0
+    sprime[6,:]   = ElectronCube.atten(x)*a
+    sprime[7,:]   = ElectronCube.phase(x)
     sprime[8,:]   = ElectronCube.neB(x,v)
     return sprime.flatten()
 
