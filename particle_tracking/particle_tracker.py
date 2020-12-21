@@ -94,7 +94,7 @@ class ElectronCube:
     """A class to hold and generate electron density cubes
     """
     
-    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False):
+    def __init__(self, x, y, z, extent, B_on = False, inv_brems = False, phaseshift = False, probing_direction = 'z'):
         """
         Example:
             N_V = 100
@@ -113,6 +113,7 @@ class ElectronCube:
         self.z,self.y,self.x = z, y, x
         self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
         self.extent = extent
+        self.probing_direction = probing_direction
         # Logical switches
         self.B_on       = B_on
         self.inv_brems  = inv_brems
@@ -173,13 +174,13 @@ class ElectronCube:
         """
         self.B = B
 
-    def external_Te(self, Te):
+    def external_Te(self, Te, Te_min = 1.0):
         """Load externally generated grid
 
         Args:
             Te ([type]): MxMxM grid of electron temperature in eV
         """
-        self.Te = Te
+        self.Te = np.maximum(Te_min,Te)
 
     def external_Z(self, Z):
         """Load externally generated grid
@@ -239,15 +240,15 @@ class ElectronCube:
             o_max = np.copy(o_pe)
             o_max[o_pe < omega] = omega
             L_classical = Z*sc.e/Te
-            L_quantum = sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
+            L_quantum = 2.760428269727312e-10/np.sqrt(Te) # sc.hbar/np.sqrt(sc.m_e*sc.e*Te)
             L_max = np.maximum(L_classical, L_quantum)
             return o_max*L_max
         def coloumbLog(ne, Te, Z, omega):
-            return np.log(v_the(Te)/V(ne, Te, Z, omega))
+            return np.maximum(2.0,np.log(v_the(Te)/V(ne, Te, Z, omega)))
         ne_cc = self.ne*1e-6
         o_pe  = omega_pe(ne_cc)
         CL    = coloumbLog(ne_cc, self.Te, self.Z, self.omega)
-        return 3.1e-5*self.Z*c*np.power(ne_cc,2)*CL*np.power(self.Te, -1.5)/self.omega**2 # 1/s
+        return 3.1e-5*self.Z*c*np.power(ne_cc/self.omega,2)*CL*np.power(self.Te, -1.5) # 1/s
 
     # Plasma refractive index
     def n_refrac(self):
@@ -370,7 +371,7 @@ class ElectronCube:
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
-        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent)
+        self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
         return self.rf
 
     def clear_memory(self):
@@ -413,7 +414,7 @@ def dsdt(t, s, ElectronCube):
 
     sprime[3:6,:] = ElectronCube.dndr(x)
     sprime[:3,:]  = v
-    sprime[6,:]   = ElectronCube.atten(x)
+    sprime[6,:]   = ElectronCube.atten(x)*a
     sprime[7,:]   = ElectronCube.phase(x)
     sprime[8,:]   = ElectronCube.neB(x,v)
     return sprime.flatten()
