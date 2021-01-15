@@ -125,10 +125,10 @@ def knife_edge(axis, rays, edge = 1e-1):
     rays[:,filt]=None
     return rays
 
-    class Rays:
+class Rays:
     """
     Inheritable class for ray diagnostics.
-    """
+        """
     def __init__(self, r0, L=400, R=25, Lx=18, Ly=13.5, object_length = 0):
         """Initialise ray diagnostic.
 
