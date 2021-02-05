@@ -324,7 +324,7 @@ class ElectronCube:
     # Phase shift introduced by refractive index
     def phase(self,x):
         if(self.phaseshift):
-            return self.omega*(self.refractive_index_interp(x.T)-1.0)
+            return self.omega*self.refractive_index_interp(x.T)
         else:
             return 0.0
 

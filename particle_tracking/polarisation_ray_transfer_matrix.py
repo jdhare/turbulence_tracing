@@ -20,6 +20,8 @@ rr0=np.matmul(scales, rr0)
 r0=circular_aperture(5, rr0) #cut out a circle
 
 ### Shadowgraphy, no polarisation
+## object_length: determines where the focal plane is. If you object is 10 mm long, object length = 5 will
+## make the focal plane in the middle of the object. Yes, it's a bad variable name.
 s = Shadowgraphy(rr0, L = 400, R = 25, object_length=5)
 s.solve()
 s.histogram(bin_scale = 25)
@@ -34,6 +36,8 @@ s.plot(axs, clim=clim, cmap=cm)
 ### Faraday, with a polarisation β, in degrees, which puts the axis of extinction at beta degrees to the y direction.
 ### that is, beta = 0 extinguishes E_y, beta = 90 extinguishes E_x
 ### of course, in this example we have E_x = i E_y, so all the polariser will do is reduce the intensity.
+## object_length: determines where the focal plane is. If you object is 10 mm long, object length = 5 will
+## make the focal plane in the middle of the object. Yes, it's a bad variable name.
 f = Faraday(rr0, L = 400, R = 25, object_length=5)
 f.solve(β = 80)
 f.histogram(bin_scale = 25)
