@@ -111,6 +111,7 @@ class ElectronCube:
             extent (float): physical size, m
         """
         self.z,self.y,self.x = z, y, x
+        self.dx = x[1]-x[0]
         self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
         self.extent = extent
         self.probing_direction = probing_direction
@@ -317,7 +318,7 @@ class ElectronCube:
     # Attenuation due to inverse bremsstrahlung
     def atten(self,x):
         if(self.inv_brems):
-            return self.kappa_interp(x.T)
+            return -self.kappa_interp(x.T)
         else:
             return 0.0
 
@@ -354,7 +355,7 @@ class ElectronCube:
 
         return pol
 
-    def solve(self, s0):
+    def solve(self, s0, method = 'RK45'):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
@@ -365,12 +366,14 @@ class ElectronCube:
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
-        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t)
+        sol = solve_ivp(dsdt_ODE, [0,t[-1]], s0, t_eval=t, method = method)
         finish = time()
         print("Ray trace completed in:\t",finish-start,"s")
 
         Np = s0.size//9
         self.sf = sol.y[:,-1].reshape(9,Np)
+        # Fix amplitudes
+        self.sf[6,self.sf[6,:] < 0.0] = 0.0
         self.rf,self.Jf = ray_to_Jonesvector(self.sf, self.extent, probing_direction = self.probing_direction)
         return self.rf
 
@@ -415,8 +418,10 @@ def dsdt(t, s, ElectronCube):
     sprime[3:6,:] = ElectronCube.dndr(x)
     sprime[:3,:]  = v
     sprime[6,:]   = ElectronCube.atten(x)*a
+    sprime[6,a < 1e-5] = 0.0
     sprime[7,:]   = ElectronCube.phase(x)
     sprime[8,:]   = ElectronCube.neB(x,v)
+
     return sprime.flatten()
 
 def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
