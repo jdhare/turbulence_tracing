@@ -258,6 +258,7 @@ class ElectronCube:
             return 5.64e4*np.sqrt(ne)
         ne_cc = self.ne*1e-6
         o_pe  = omega_pe(ne_cc)
+        o_pe[o_pe > self.omega] = self.omega
         return np.sqrt(1.0-(o_pe/self.omega)**2)
 
     def set_up_interps(self):
