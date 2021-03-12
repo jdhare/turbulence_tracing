@@ -425,7 +425,7 @@ def dsdt(t, s, ElectronCube):
 
     return sprime.flatten()
 
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
+def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z', coherent = False):
     """[summary]
 
     Args:
@@ -486,8 +486,17 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         s0[2,:] = beam_size*u*np.sin(t)
 
     # Initialise amplitude, phase and polarisation
+
+    if coherent is False:
+        #then it's incoherent, random phase
+        print('Incoherent')
+        phase = 2*np.pi*np.random.rand(Np)
+    if coherent is True:
+        print('Coherent')
+        phase = np.zeros(Np)
+
     s0[6,:] = 1.0
-    s0[7,:] = 0.0
+    s0[7,:] = phase
     s0[8,:] = 0.0
     return s0
 

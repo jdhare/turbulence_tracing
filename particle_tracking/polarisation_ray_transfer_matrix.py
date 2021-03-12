@@ -133,7 +133,7 @@ class Rays:
     """
     Inheritable class for ray diagnostics.
         """
-    def __init__(self, r0, L=400, R=25, Lx=18, Ly=13.5, object_length = 0):
+    def __init__(self, r0, L=400, R=25, Lx=18, Ly=13.5, focal_plane = 0):
         """Initialise ray diagnostic.
 
         Args:
@@ -142,9 +142,9 @@ class Rays:
             R (int, optional): Radius of lenses. Defaults to 25.
             Lx (int, optional): Detector size in x. Defaults to 18.
             Ly (float, optional): Detector size in y. Defaults to 13.5.
-            Object_length (float, optional): Length of object (diagnostic focused at object center). Defaults to 0.
+            Object_length (float, optional): Where the focus of the first optic should lie - 0 means at the near side of the density cube
         """        
-        self.r0, self.L, self.R, self.Lx, self.Ly, self.object_length = r0, L, R, Lx, Ly, object_length
+        self.r0, self.L, self.R, self.Lx, self.Ly, self.focal_plane = r0, L, R, Lx, Ly, focal_plane
 
     def histogram(self, bin_scale=10, pix_x=3448, pix_y=2574, clear_mem=False):
         """Bin data into a histogram. Defaults are for a KAF-8300.
@@ -221,7 +221,7 @@ class Rays:
         
 class Shadowgraphy(Rays):
     def solve(self):
-        rl1=np.matmul(distance(self.L - self.object_length), self.r0) #displace rays to lens. Accounts for object with depth
+        rl1=np.matmul(distance(self.L - self.focal_plane), self.r0) #displace rays to lens. Accounts for object with depth
         rc1=circular_aperture(self.R, rl1) # cut off
         r2=np.matmul(sym_lens(self.L/2), rc1) #lens 1
 
@@ -235,7 +235,7 @@ class Shadowgraphy(Rays):
         
 class Faraday(Rays):
     def solve(self, β = 3.0):
-        rl1=np.matmul(distance(self.L - self.object_length), self.r0) #displace rays to lens. Accounts for object with depth
+        rl1=np.matmul(distance(self.L - self.focal_plane), self.r0) #displace rays to lens. Accounts for object with depth
         rc1=circular_aperture(self.R, rl1) # cut off
         r2=np.matmul(sym_lens(self.L/2), rc1) #lens 1
 
