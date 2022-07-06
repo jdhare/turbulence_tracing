@@ -174,10 +174,6 @@ class ElectronCube:
         self.omega = 2*np.pi*(c/lwl)
         nc = 3.14207787e-4*self.omega**2
 
-        # Find Faraday rotation constant http://farside.ph.utexas.edu/teaching/em/lectures/node101.html
-        if (self.B_on):
-            self.VerdetConst = 2.62e-13*lwl**2 # radians per Tesla per m^2
-
         self.ne_nc = self.ne/nc #normalise to critical density
         
         #More compact notation is possible here, but we are explicit
@@ -319,9 +315,9 @@ def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
         probing_direction (str): direction of probing. I suggest 'z', the best tested
 
     Returns:
-        s0, 9 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s and amplitude, phase and polarisation (a, p, r) 
+        s0, 6 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s
     """
-    s0 = np.zeros((9,Np))
+    s0 = np.zeros((6,Np))
     # position, uniformly within a circle
     t  = 2*np.pi*np.random.rand(Np) #polar angle of position
     u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
