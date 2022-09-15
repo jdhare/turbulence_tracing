@@ -94,7 +94,7 @@ class ElectronCube:
     """A class to hold and generate electron density cubes
     """
     
-    def __init__(self, x, y, z, extent, probing_direction = 'z'):
+    def __init__(self, x, y, z, probing_direction = 'z'):
         """
         Example:
             N_V = 100
@@ -111,16 +111,16 @@ class ElectronCube:
             extent (float): physical size, m
         """
         self.z,self.y,self.x = z, y, x
-        self.dx = x[1]-x[0]
-        self.XX, self.YY, self.ZZ = np.meshgrid(x,y,z, indexing='ij')
-        self.extent = extent
+        self.extent_x = x.max()
+        self.extent_y = y.max()
+        self.extent_z = z.max()
         self.probing_direction = probing_direction
-
         
     def test_null(self):
         """
         Null test, an empty cube
         """
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
         self.ne = np.zeros_like(self.XX)
         
     def test_slab(self, s=1, n_e0=2e23):
@@ -133,7 +133,8 @@ class ElectronCube:
             s (int, optional): scale factor. Defaults to 1.
             n_e0 ([type], optional): mean density. Defaults to 2e23 m^-3.
         """
-        self.ne = n_e0*(1.0+s*self.XX/self.extent)
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
+        self.ne = n_e0*(1.0+s*self.XX/self.extent_x)
         
     def test_linear_cos(self,s1=0.1,s2=0.1,n_e0=2e23,Ly=1):
         """Linearly growing sinusoidal perturbation
@@ -144,7 +145,8 @@ class ElectronCube:
             n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1.
         """
-        self.ne = n_e0*(1.0+s1*self.XX/self.extent)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
+        self.ne = n_e0*(1.0+s1*self.XX/self.extent_x)*(1+s2*np.cos(2*np.pi*self.YY/Ly))
         
     def test_exponential_cos(self,n_e0=1e24,Ly=1e-3, s=2e-3):
         """Exponentially growing sinusoidal perturbation
@@ -154,7 +156,20 @@ class ElectronCube:
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
+
+    def test_lens(self,n_e0=1e24,LR=1e-3):
+        """Exponentially growing sinusoidal perturbation
+
+        Args:
+            n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
+            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
+            s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
+        """
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
+        RR = np.sqrt(self.XX**2 + self.YY**2)
+        self.ne = n_e0*np.exp(-RR**2/LR**2)
         
     def external_ne(self, ne):
         """Load externally generated grid
@@ -184,48 +199,7 @@ class ElectronCube:
         self.dndx_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndx, bounds_error = False, fill_value = 0.0)
         self.dndy_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndy, bounds_error = False, fill_value = 0.0)
         self.dndz_interp = RegularGridInterpolator((self.x, self.y, self.z), self.dndz, bounds_error = False, fill_value = 0.0)
-
- 
-    # Plasma refractive index
-    def n_refrac(self):
-        def omega_pe(ne):
-            '''Calculate electron plasma freq. Output units are rad/sec. From nrl pp 28'''
-            return 5.64e4*np.sqrt(ne)
-        ne_cc = self.ne*1e-6
-        o_pe  = omega_pe(ne_cc)
-        o_pe[o_pe > self.omega] = self.omega
-        return np.sqrt(1.0-(o_pe/self.omega)**2)
-
-    def set_up_interps(self):
-        # Electron density
-        self.ne_interp = RegularGridInterpolator((self.x, self.y, self.z), self.ne, bounds_error = False, fill_value = 0.0)
-
-
-    def plot_midline_gradients(self,ax,probing_direction):
-        """I actually don't know what this does. Presumably plots the gradients half way through the box? Cool.
-
-        Args:
-            ax ([type]): [description]
-            probing_direction ([type]): [description]
-        """
-        N_V = self.x.shape[0]//2
-        if(probing_direction == 'x'):
-            ax.plot(self.y,self.dndx[:,N_V,N_V])
-            ax.plot(self.y,self.dndy[:,N_V,N_V])
-            ax.plot(self.y,self.dndz[:,N_V,N_V])
-        elif(probing_direction == 'y'):
-            ax.plot(self.y,self.dndx[N_V,:,N_V])
-            ax.plot(self.y,self.dndy[N_V,:,N_V])
-            ax.plot(self.y,self.dndz[N_V,:,N_V])
-        elif(probing_direction == 'z'):
-            ax.plot(self.y,self.dndx[N_V,N_V,:])
-            ax.plot(self.y,self.dndy[N_V,N_V,:])
-            ax.plot(self.y,self.dndz[N_V,N_V,:])
-        else: # Default to y
-            ax.plot(self.y,self.dndx[N_V,:,N_V])
-            ax.plot(self.y,self.dndy[N_V,:,N_V])
-            ax.plot(self.y,self.dndz[N_V,:,N_V])
-    
+   
     def dndr(self,x):
         """returns the gradient at the locations x
 
@@ -241,17 +215,68 @@ class ElectronCube:
         grad[2,:] = self.dndz_interp(x.T)
         return grad
 
-    def get_ne(self,x):
-        return self.ne_interp(x.T)
+    def init_beam(self, Np, beam_size, divergence):
+        """[summary]
 
-    def solve(self, s0, method = 'RK45'):
+        Args:
+            Np (int): Number of photons
+            beam_size (float): beam radius, m
+            divergence (float): beam divergence, radians
+            ne_extent (float): size of electron density cube, m. Used to back propagate the rays to the start
+            probing_direction (str): direction of probing. I suggest 'z', the best tested
+
+        Returns:
+            s0, 6 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s
+        """
+        s0 = np.zeros((6,Np))
+        # position, uniformly within a circle
+        t  = 2*np.pi*np.random.rand(Np) #polar angle of position
+        u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
+        u[u > 1] = 2-u[u > 1]
+        # angle
+        ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
+        χ = divergence*np.random.randn(Np) #polar angle of velocity
+
+        if(self.probing_direction == 'x'):
+            self.extent = self.extent_x
+            # Initial velocity
+            s0[3,:] = c * np.cos(χ)
+            s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = self.extent
+            s0[1,:] = beam_size*u*np.cos(t)
+            s0[2,:] = beam_size*u*np.sin(t)
+        elif(self.probing_direction == 'y'):
+            self.extent = self.extent_y
+            # Initial velocity
+            s0[4,:] = c * np.cos(χ)
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
+            # Initial position
+            s0[0,:] = beam_size*u*np.cos(t)
+            s0[1,:] = -self.extent
+            s0[2,:] = beam_size*u*np.sin(t)
+        elif(self.probing_direction == 'z'):
+            self.extent = self.extent_z
+            # Initial velocity
+            s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
+            s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
+            s0[5,:] = c * np.cos(χ)
+            # Initial position
+            s0[0,:] = beam_size*u*np.cos(t)
+            s0[1,:] = beam_size*u*np.sin(t)
+            s0[2,:] = -self.extent
+        self.s0 = s0
+
+    def solve(self, method = 'RK45'):
         # Need to make sure all rays have left volume
         # Conservative estimate of diagonal across volume
         # Then can backproject to surface of volume
 
         t  = np.linspace(0.0,np.sqrt(8.0)*self.extent/c,2)
 
-        s0 = s0.flatten() #odeint insists
+        s0 = self.s0.flatten() #odeint insists
 
         start = time()
         dsdt_ODE = lambda t, y: dsdt(t, y, self)
@@ -262,8 +287,57 @@ class ElectronCube:
         Np = s0.size//6
         self.sf = sol.y[:,-1].reshape(6,Np)
         # Fix amplitudes
-        self.rf = ray_at_exit(self.sf, self.extent, probing_direction = self.probing_direction)
+        self.rf = self.ray_at_exit()
         return self.rf
+
+    def ray_at_exit(self):
+        """Takes the output from the 6D solver and returns 4D rays for ray-transfer matrix techniques.
+        Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
+
+        Args:
+            ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
+            ne_extent (float): edge length of cube, m
+            probing_direction (str): x, y or z.
+
+        Returns:
+            [type]: [description]
+        """
+        ode_sol = self.sf
+        Np = ode_sol.shape[1] # number of photons
+        ray_p = np.zeros((4,Np))
+
+        x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
+
+        # Resolve distances and angles
+        # YZ plane
+        if(self.probing_direction == 'x'):
+            t_bp = (x-self.extent)/vx
+            # Positions on plane
+            ray_p[0] = y-vy*t_bp
+            ray_p[2] = z-vz*t_bp
+            # Angles to plane
+            ray_p[1] = np.arctan(vy/vx)
+            ray_p[3] = np.arctan(vz/vx)
+        # XZ plane
+        elif(self.probing_direction == 'y'):
+            t_bp = (y-self.extent)/vy
+            # Positions on plane
+            ray_p[0] = x-vx*t_bp
+            ray_p[2] = z-vz*t_bp
+            # Angles to plane
+            ray_p[1] = np.arctan(vx/vy)
+            ray_p[3] = np.arctan(vz/vy)
+        # XY plane
+        elif(self.probing_direction == 'z'):
+            t_bp = (z-self.extent)/vz
+            # Positions on plane
+            ray_p[0] = x-vx*t_bp
+            ray_p[2] = y-vy*t_bp
+            # Angles to plane
+            ray_p[1] = np.arctan(vx/vz)
+            ray_p[3] = np.arctan(vy/vz)
+
+        return ray_p
 
     def clear_memory(self):
         """
@@ -279,18 +353,27 @@ class ElectronCube:
         self.ne_nc = None
         self.sf = None
         self.rf = None
+
+    def pickle(self):
+        """
+        Clear unnecessary arrays and pickle the electron density and the final ray positions
+        """
+        self.dndx = None
+        self.dndx = None
+        self.dndx = None
+        self.ne_nc = None
+        self.sf = None
     
-# ODEs of photon paths
 def dsdt(t, s, ElectronCube):
-    """Returns an array with the gradients and velocity per ray for ode_int
+    """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ElectronCube due to expected call signature for the ODE solver
 
     Args:
         t (float array): I think this is a dummy variable for ode_int - our problem is time invarient
-        s (9N float array): flattened 9xN array of rays used by ode_int
+        s (6N float array): flattened 6xN array of rays used by ode_int
         ElectronCube (ElectronCube): an ElectronCube object which can calculate gradients
 
     Returns:
-        9N float array: flattened array for ode_int
+        6N float array: flattened array for ode_int
     """
     Np     = s.size//6
     s      = s.reshape(6,Np)
@@ -303,114 +386,3 @@ def dsdt(t, s, ElectronCube):
     sprime[:3,:]  = v
 
     return sprime.flatten()
-
-def init_beam(Np, beam_size, divergence, ne_extent, probing_direction = 'z'):
-    """[summary]
-
-    Args:
-        Np (int): Number of photons
-        beam_size (float): beam radius, m
-        divergence (float): beam divergence, radians
-        ne_extent (float): size of electron density cube, m. Used to back propagate the rays to the start
-        probing_direction (str): direction of probing. I suggest 'z', the best tested
-
-    Returns:
-        s0, 6 x N float: N rays with (x, y, z, vx, vy, vz) in m, m/s
-    """
-    s0 = np.zeros((6,Np))
-    # position, uniformly within a circle
-    t  = 2*np.pi*np.random.rand(Np) #polar angle of position
-    u  = np.random.rand(Np)+np.random.rand(Np) # radial coordinate of position
-    u[u > 1] = 2-u[u > 1]
-    # angle
-    ϕ = np.pi*np.random.rand(Np) #azimuthal angle of velocity
-    χ = divergence*np.random.randn(Np) #polar angle of velocity
-
-    if(probing_direction == 'x'):
-        # Initial velocity
-        s0[3,:] = c * np.cos(χ)
-        s0[4,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-        # Initial position
-        s0[0,:] = -ne_extent
-        s0[1,:] = beam_size*u*np.cos(t)
-        s0[2,:] = beam_size*u*np.sin(t)
-    elif(probing_direction == 'y'):
-        # Initial velocity
-        s0[4,:] = c * np.cos(χ)
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)
-        # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = -ne_extent
-        s0[2,:] = beam_size*u*np.sin(t)
-    elif(probing_direction == 'z'):
-        # Initial velocity
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[4,:] = c * np.sin(χ) * np.sin(ϕ)
-        s0[5,:] = c * np.cos(χ)
-        # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = beam_size*u*np.sin(t)
-        s0[2,:] = -ne_extent
-    else: # Default to y
-        print("Default to y")
-        # Initial velocity
-        s0[4,:] = c * np.cos(χ)
-        s0[3,:] = c * np.sin(χ) * np.cos(ϕ)
-        s0[5,:] = c * np.sin(χ) * np.sin(ϕ)        
-        # Initial position
-        s0[0,:] = beam_size*u*np.cos(t)
-        s0[1,:] = -ne_extent
-        s0[2,:] = beam_size*u*np.sin(t)
-    return s0
-
-def ray_at_exit(ode_sol, ne_extent, probing_direction = 'z'):
-    """Takes the output from the 6D solver and returns 4D rays for ray-transfer matrix techniques.
-    Effectively finds how far the ray is from the end of the volume, returns it to the end of the volume.
-
-    Args:
-        ode_sol (6xN float): N rays in (x,y,z,vx,vy,vz) format, m and m/s and amplitude, phase and polarisation
-        ne_extent (float): edge length of cube, m
-        probing_direction (str): x, y or z.
-
-    Returns:
-        [type]: [description]
-    """
-    Np = ode_sol.shape[1] # number of photons
-    ray_p = np.zeros((4,Np))
-
-    x, y, z, vx, vy, vz = ode_sol[0], ode_sol[1], ode_sol[2], ode_sol[3], ode_sol[4], ode_sol[5]
-
-    # Resolve distances and angles
-    # YZ plane
-    if(probing_direction == 'x'):
-        t_bp = (x-ne_extent)/vx
-        # Positions on plane
-        ray_p[0] = y-vy*t_bp
-        ray_p[2] = z-vz*t_bp
-        # Angles to plane
-        ray_p[1] = np.arctan(vy/vx)
-        ray_p[3] = np.arctan(vz/vx)
-    # XZ plane
-    elif(probing_direction == 'y'):
-        t_bp = (y-ne_extent)/vy
-        # Positions on plane
-        ray_p[0] = x-vx*t_bp
-        ray_p[2] = z-vz*t_bp
-        # Angles to plane
-        ray_p[1] = np.arctan(vx/vy)
-        ray_p[3] = np.arctan(vz/vy)
-    # XY plane
-    elif(probing_direction == 'z'):
-        t_bp = (z-ne_extent)/vz
-        # Positions on plane
-        ray_p[0] = x-vx*t_bp
-        ray_p[2] = y-vy*t_bp
-        # Angles to plane
-        ray_p[1] = np.arctan(vx/vz)
-        ray_p[3] = np.arctan(vy/vz)
-
-    return ray_p
-
-
