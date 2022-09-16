@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 '''
 Example:
@@ -108,13 +109,29 @@ def angular_filter(r, Rs):
     Filters rays to find those inside a radius R
     '''
 
-    f = np.zeros((r.shape[1]), dtype = Bool)
+    f = np.zeros((r.shape[1]), dtype = bool)
 
     for i in range(0, len(Rs)//2):
         R1 = Rs[2*i]
         R2 = Rs[2*i+1]
         f += annular_stop(r, R1, R2)
+    r[:,f]=None
     return r
+
+def plot_afr(Rs):
+    fig, ax = plt.subplots(figsize = (4,4), dpi = 200)
+    for i in range(0, len(Rs)//2):
+        R1 = Rs[2*i]
+        R2 = Rs[2*i+1]
+        dR = R2-R1
+        if dR >= R2:
+            an = mpl.patches.Circle((0,0), R2)
+        else:
+            an = mpl.patches.Annulus((0,0), R2, dR)
+        ax.add_patch(an)
+    ax.set_xlim([-Rs.max(), Rs.max()])
+    ax.set_ylim([-Rs.max(), Rs.max()])
+    return fig, ax
 
 def rect_aperture(r, Lx, Ly):
     '''

@@ -152,7 +152,7 @@ class ElectronCube:
         """Exponentially growing sinusoidal perturbation
 
         Args:
-            n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
+            n_e0 ([type], optional): mean electron density. Defaults to 1e24 m^-3.
             Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
             s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
         """
@@ -160,17 +160,27 @@ class ElectronCube:
         self.ne = n_e0*10**(self.XX/s)*(1+np.cos(2*np.pi*self.YY/Ly))
 
     def test_lens(self,n_e0=1e24,LR=1e-3):
-        """Exponentially growing sinusoidal perturbation
+        """Normal distribution with axis along z
 
         Args:
-            n_e0 ([type], optional): mean electron density. Defaults to 2e23 m^-3.
-            Ly (int, optional): spatial scale of sinusoidal perturbation. Defaults to 1e-3 m.
-            s ([type], optional): scale of exponential growth. Defaults to 2e-3 m.
+            n_e0 ([type], optional): peak electron density. Defaults to 1e24 m^-3.
+            LR (int, optional): Spatial scale of gaussian. Defaults to 1e-3 m.
         """
         self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
         RR = np.sqrt(self.XX**2 + self.YY**2)
         self.ne = n_e0*np.exp(-RR**2/LR**2)
-        
+
+    def test_liner(self,n_e0=1e24,LR=1e-3):
+        """Normal distribution with axis along y
+
+        Args:
+            n_e0 ([type], optional): peak electron density. Defaults to 1e24 m^-3.
+            LR (int, optional): Spatial scale of gaussian. Defaults to 1e-3 m.
+        """
+        self.XX, self.YY, self.ZZ = np.meshgrid(self.x,self.y,self.z, indexing='ij')
+        RR = np.sqrt(self.XX**2 + self.ZZ**2)
+        self.ne = n_e0*np.exp(-RR**2/LR**2)
+
     def external_ne(self, ne):
         """Load externally generated grid
 
@@ -179,7 +189,7 @@ class ElectronCube:
         """
         self.ne = ne
 
-    def calc_dndr(self, lwl=1053e-9):
+    def calc_dndr(self, lwl=1053e-9, ne_max = 1):
         """Generate interpolators for derivatives.
 
         Args:
@@ -189,7 +199,9 @@ class ElectronCube:
         self.omega = 2*np.pi*(c/lwl)
         nc = 3.14207787e-4*self.omega**2
 
-        self.ne_nc = self.ne/nc #normalise to critical density
+        ne_nc = self.ne/nc #normalise to critical density
+        ne_nc[ne_nc>ne_max] = ne_max # don't allow densities above ne_max
+        self.ne_nc = ne_nc
         
         #More compact notation is possible here, but we are explicit
         self.dndx = -0.5*c**2*np.gradient(self.ne_nc,self.x,axis=0)
