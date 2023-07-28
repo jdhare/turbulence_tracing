@@ -80,14 +80,6 @@ def circular_aperture(r, R):
 
 def circular_stop(r, R):
     '''
-    Filters rays to find those inside a radius R
-    '''
-    filt = r[0,:]**2+r[2,:]**2 < R**2
-    r[:,filt]=None
-    return r
-
-def circular_stop(r, R):
-    '''
     Rjects rays inside a radius R
     '''
     filt = r[0,:]**2+r[2,:]**2 < R**2
@@ -143,16 +135,21 @@ def rect_aperture(r, Lx, Ly):
     r[:,filt]=None
     return r
 
-def knife_edge(r, axis, edge = 0):
+def knife_edge(r, offset, axis, direction):
     '''
     Filters rays using a knife edge.
     Default is a knife edge in y, can also do a knife edge in x.
     '''
-    if axis is 'y':
+    if axis == 'y':
         a=2
-    else:
+    if axis == 'x':
         a=0
-    filt = r[a,:] < edge
+    if direction > 0:
+        filt = r[a,:] > offset
+    if direction < 0:
+        filt = r[a,:] < offset
+    if direction == 0:
+        print('Direction must be <0 or >0')
     r[:,filt]=None
     return r
 
@@ -209,17 +206,94 @@ class Rays:
         self.rf = None
         
 class Shadowgraphy(Rays):
+    """
+    Example shadowgraphy diagnostic. Inherits from Rays, has custom solve method.
+    Implements a two lens telescope with M = 1. Both lenses have a f = L/2 focal length, where L is a length scale specified when the class is initialized.
+    Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
+    """
     def solve(self):
-        rl1=np.matmul(distance(self.L - self.focal_plane), self.r0) #displace rays to lens. Accounts for object with depth
-        rc1=circular_aperture(self.R, rl1) # cut off
-        r2=np.matmul(sym_lens(self.L/2), rc1) #lens 1
+        ## 2 lens telescope, M = 1
+        r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r2=circular_aperture(r1, self.R) # cut off
+        r3=sym_lens(r2, self.L) #lens 1
 
-        rl2=np.matmul(distance(3*self.L/2), r2) #displace rays to lens 2.
-        rc2=circular_aperture(self.R, rl2) # cut off
-        r3=np.matmul(sym_lens(self.L/3), rc2) #lens 2
+        r4=distance(r3, self.L*2) #displace rays to lens 2.
 
-        rd3=np.matmul(distance(self.L), r3) #displace rays to detector
+        r5=circular_aperture(r4, self.R) # cut off
+        r6=sym_lens(r5, self.L) #lens 2
 
-        self.rf = rd3
-       
+        r7=distance(r6, self.L) #displace rays to detector
 
+        self.rf = r7
+        
+class Schlieren_DF(Rays):
+    """
+    Example dark field schlieren diagnostic. Inherits from Rays, has custom solve method.
+    Implements a two lens telescope with M = 1. Both lenses have a f = L focal length, where L is a length scale specified when the class is initialized.
+    Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
+    There is a circular stop placed at the focal point afte rthe first lens which rejects rays which hit the focal planes at distance less than R [mm] from the optical axis.
+    """
+    def solve(self, R = 1):
+        ## 2 lens telescope, M = 1
+        r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r2=circular_aperture(r1, self.R) # cut off
+        r3=sym_lens(r2, self.L) #lens 1
+
+        r4=distance(r3, self.L) #displace rays to stop
+        r5=circular_stop(r4, R = R) # stop
+
+        r6=distance(r5, self.L) #displace rays to lens 2
+        r7=circular_aperture(r6, self.R) # cut off
+        r8=sym_lens(r7, self.L) #lens 2
+
+        r9=distance(r8, self.L) #displace rays to detector
+        self.rf = r9
+        
+class Schlieren_LF(Rays):
+    """
+    Example light field schlieren diagnostic. Inherits from Rays, has custom solve method.
+    Implements a two lens telescope with M = 1. Both lenses have a f = L/2 focal length, where L is a length scale specified when the class is initialized.
+    Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
+    There is a circular stop placed at the focal point afte rthe first lens which accepts only rays which hit the focal planes at distance less than R [mm] from the optical axis.
+    """
+    def solve(self, R = 1):
+        ## 2 lens telescope, M = 1
+        r1=distance(self.r0, self.L - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r2=circular_aperture(r1, self.R) # cut off
+        r3=sym_lens(r2, self.L) #lens 1
+
+        r4=distance(r3, self.L) #displace rays to stop
+        r5=circular_aperture(r4, R = R) # stop
+
+        r6=distance(r5, self.L) #displace rays to lens 2
+        r7=circular_aperture(r6, self.R) # cut off
+        r8=sym_lens(r7, self.L) #lens 2
+
+        r9=distance(r8, self.L) #displace rays to detector
+        self.rf = r9
+
+class AFR(Rays):
+    """
+    Example angular fringe refractometry diagnostic. Inherits from Rays, has custom solve method.
+    Implements a two lens telescope with M = 1. Both lenses have a f = L/2 focal length, where L is a length scale specified when the class is initialized.
+    Each optic has a radius R, which is used to reject rays outside the numerical aperture of the optical system.
+    There is a series of annuli placed at the focal point after the first lens. 
+    The radius of these annuli are specified as a list, Rs. 
+    The opaque regions of the stop are between odd and even elements of the list - the regions between even and odd elemetns are considered transparent.
+    The list can be of arbitrary length with unevenly spaced elements.
+    """
+    def solve(self, Rs):
+        ## 2 lens telescope, M = 1
+        r1=distance(self.r0, self.L/2 - self.focal_plane) #displace rays to lens. Accounts for object with depth
+        r2=circular_aperture(r1, self.R) # cut off
+        r3=sym_lens(r2, self.L/2) #lens 1
+
+        r4=distance(r3, self.L/4) #displace rays to stop
+        r5=angular_filter(r4, Rs = Rs) # stop
+
+        r6=distance(r5, self.L/4) #displace rays to lens 2
+        r7=circular_aperture(r6, self.R) # cut off
+        r8=sym_lens(r7, self.L/2) #lens 2
+
+        r9=distance(r8, self.L/2) #displace rays to detector
+        self.rf = r9

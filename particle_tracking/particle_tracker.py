@@ -14,35 +14,57 @@ EXAMPLES:
 #NULL TEST: no deflection
 import particle_tracker as pt
 
+## Create the coordiantes for a cube with 201x201x201 cells, 
+## and attach a [-5,5] mm coordinate system to them.
+
 N_V = 100
 M_V = 2*N_V+1
-ne_extent = 5.0e-3
-ne_x = np.linspace(-ne_extent,ne_extent,M_V)
-ne_y = np.linspace(-ne_extent,ne_extent,M_V)
-ne_z = np.linspace(-ne_extent,ne_extent,M_V)
+extent = 5.0e-3
+x = np.linspace(-extent,extent,M_V)
+y = np.linspace(-extent,extent,M_V)
+z = np.linspace(-extent,extent,M_V)
 
-null = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
+null = pt.ElectronCube(x,y,z)
 null.test_null()
 null.calc_dndr()
 
-### Initialise rays
-s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0.5e-3, ne_extent = ne_extent)
 ### solve
-null.solve(s0)
+null.solve()
+s0 = null.s0
 rf = null.rf
 
 ### Plot
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
+fig, axs = plt.subplots(2, 2, figsize=(8,6), dpi = 200)
 nbins = 201
 
-_,_,_,im1 = ax1.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+ax1 = axs[0,0]
+_,_,_,im1 = ax1.hist2d(s0[0]*1e3, s0[1]*1e3, bins=(nbins, nbins), cmap='gray');
 plt.colorbar(im1,ax=ax1)
 ax1.set_xlabel("x (mm)")
 ax1.set_ylabel("y (mm)")
-_,_,_,im2 = ax2.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+ax1.set_aspect('equal')
+
+ax2 = axs[0,1]
+_,_,_,im2 = ax2.hist2d(s0[3]*1e3, s0[4]*1e3, bins=(nbins, nbins), cmap='gray');
 plt.colorbar(im2,ax=ax2)
 ax2.set_xlabel(r"$\theta$ (mrad)")
 ax2.set_ylabel(r"$\phi$ (mrad)")
+ax2.set_aspect('equal')
+
+ax3 = axs[1,0]
+_,_,_,im3 = ax3.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), cmap='gray');
+plt.colorbar(im3,ax=ax3)
+ax3.set_xlabel("x (mm)")
+ax3.set_ylabel("y (mm)")
+ax3.set_aspect('equal')
+
+ax4 = axs[1,1]
+_,_,_,im4 = ax4.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), cmap='gray');
+plt.colorbar(im4,ax=ax4)
+ax4.set_xlabel(r"$\theta$ (mrad)")
+ax4.set_ylabel(r"$\phi$ (mrad)")
+ax4.set_aspect('equal')
+
 
 fig.tight_layout()
 
@@ -52,32 +74,36 @@ import particle_tracker as pt
 
 N_V = 100
 M_V = 2*N_V+1
-ne_extent = 6.0e-3
-ne_x = np.linspace(-ne_extent,ne_extent,M_V)
-ne_y = np.linspace(-ne_extent,ne_extent,M_V)
-ne_z = np.linspace(-ne_extent,ne_extent,M_V)
+extent = 5.0e-3
+x = np.linspace(-extent,extent,M_V)
+y = np.linspace(-extent,extent,M_V)
+z = np.linspace(-extent,extent,M_V)
 
-slab = pt.ElectronCube(ne_x,ne_y,ne_z,ne_extent)
-slab.test_slab(s=10, n_e0=1e25)
+slab = pt.ElectronCube(x,y,z)
+slab.test_slab(s=8, n_e0=1e25)
 slab.calc_dndr()
 
 ## Initialise rays and solve
-s0 = pt.init_beam(Np = 100000, beam_size=5e-3, divergence = 0, ne_extent = ne_extent)
-slab.solve(s0)
+slab.init_beam(Np = 100000, beam_size=2e-3, divergence = 10e-3)
+slab.solve()
+s0 = slab.s0
 rf = slab.rf
 
 ## Plot
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4), dpi = 200)
 nbins = 201
 
-_,_,_,im1 = ax1.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+_,_,_,im1 = ax1.hist2d(rf[0]*1e3, rf[2]*1e3, bins=(nbins, nbins), range = ((-3,3), (-3,3)), cmap=plt.cm.gray);
 plt.colorbar(im1,ax=ax1)
 ax1.set_xlabel("x (mm)")
 ax1.set_ylabel("y (mm)")
-_,_,_,im2 = ax2.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), cmap=plt.cm.jet);
+ax1.set_aspect('equal')
+
+_,_,_,im2 = ax2.hist2d(rf[1]*1e3, rf[3]*1e3, bins=(nbins, nbins), range = ((-100,100), (-100,100)), cmap=plt.cm.gray);
 plt.colorbar(im2,ax=ax2)
 ax2.set_xlabel(r"$\theta$ (mrad)")
 ax2.set_ylabel(r"$\phi$ (mrad)")
+ax1.set_aspect('equal')
 
 fig.tight_layout()
 """
@@ -87,6 +113,8 @@ from scipy.integrate import odeint,solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 from time import time
 import scipy.constants as sc
+import pickle
+from datetime import datetime
 
 c = sc.c # honestly, this could be 3e8 *shrugs*
 
@@ -351,30 +379,21 @@ class ElectronCube:
 
         return ray_p
 
-    def clear_memory(self):
+    def save_output_rays(self, fn = None):
         """
-        Clears variables not needed by solve method, saving memory
+        Saves the output rays as a binary numpy format for minimal size.
+        Auto-names the file using the current date and time.
+        """
+        now = datetime.now()
+        dt_string = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-        Can also use after calling solve to clear ray positions - important when running large number of rays
+        if fn is None:
+            fn = '{} rays.npy'.format(dt_string)
+        else:
+            fn = '{}.npy'.format(fn)
+        with open(fn,'wb') as f:
+            np.save(f, self.rf)
 
-        """
-        self.dndx = None
-        self.dndx = None
-        self.dndx = None
-        self.ne = None
-        self.ne_nc = None
-        self.sf = None
-        self.rf = None
-
-    def pickle(self):
-        """
-        Clear unnecessary arrays and pickle the electron density and the final ray positions
-        """
-        self.dndx = None
-        self.dndx = None
-        self.dndx = None
-        self.ne_nc = None
-        self.sf = None
     
 def dsdt(t, s, ElectronCube):
     """Returns an array with the gradients and velocity per ray for ode_int. Cannot be a method of ElectronCube due to expected call signature for the ODE solver

@@ -123,3 +123,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+particle_tracking/test2.pkl
+.vs/slnx.sqlite
+.vs/turbulence_tracing/project-colors.json
+.vs/turbulence_tracing/v17/.suo
+.vs/VSWorkspaceState.json
